@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Vocabulary</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    h1 {
+      text-align: center;
+    }
+    .word, .sentence {
+      padding: 8px 12px;
+      margin: 6px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .word:hover, .sentence:hover {
+      background-color: #f0f0f0;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>My Vocabulary</h1>
+
+  <div class="word" ondblclick="editText(this)">apple</div>
+  <div class="sentence" ondblclick="editText(this)">I eat an apple every day.</div>
+
+  <button onclick="playAll()">Play All</button>
+
+  <!-- 正確引用靜態資源 -->
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
