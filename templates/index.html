@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>My Vocabulary</title>
@@ -10,45 +11,81 @@
       margin: 2rem auto;
       padding: 0 1rem;
     }
-    label, input, button {
+
+    label,
+    input,
+    button {
       display: block;
       margin: 10px 0;
     }
+
     input {
       width: 100%;
       padding: 8px;
       font-size: 16px;
     }
+
     button {
       margin-right: 10px;
       padding: 10px 20px;
       font-size: 16px;
       cursor: pointer;
     }
+
     .button-group {
       margin-top: 20px;
     }
   </style>
-</head>
-<body>
 
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+
+<body>
+ 
   <h1>My Vocabulary</h1>
 
+  <!-- Google 登入區塊 -->
+  <div id="g_id_onload" data-client_id="593936297858-1febokqg33f4pb2sa4kf1cmobg75268q.apps.googleusercontent.com"
+    data-callback="handleCredentialResponse" data-auto_prompt="false">
+  </div>
+
+  <div class="g_id_signin" id="g-signin-btn" <!-- ✅ 加上這行 -->
+    data-type="standard"
+    data-size="large"
+    data-theme="outline"
+    data-text="sign_in_with"
+    data-shape="rectangular"
+    data-logo_alignment="left">
+  </div>
+
+  <button onclick="logout()">登出</button>
+
   <label for="word">Word</label>
-  <input type="text" id="word" value="apple" />
+  <input type="text" id="word" value="" />
 
   <label for="sentence">Sentence</label>
-  <input type="text" id="sentence" value="I eat an apple every day." />
+  <input type="text" id="sentence" value="" />
+
+  <label for="chinese">中文發音:</label>
+  <input type="text" id="chinese" name="chinese">
 
   <div class="button-group">
+    <button onclick="saveEntry()">保存</button>
     <button onclick="startRepeat('word')">🔁 持續重複播放 單字</button>
     <button onclick="startRepeat('sentence')">🔁 持續重複播放 例句</button>
     <button onclick="startRepeat('both')">🔁 持續重複播放 單字 + 例句</button>
+    <button onclick="playAll()">🔁 持續重複播放 播放全部</button>
     <button onclick="playAllOnce()">▶️ 播放一次 單字 + 例句</button>
     <button onclick="stopRepeat()">⏹ 停止重複播放</button>
   </div>
 
+  <hr>
+  <h3>已儲存項目</h3>
+  <div id="saved-entries"></div>
+
+  <!-- script.js 載入 -->
   <script src="{{ url_for('static', filename='script.js') }}"></script>
 
 </body>
+
 </html>
