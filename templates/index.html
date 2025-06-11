@@ -87,6 +87,10 @@
     <button onclick="stopRepeat()">⏹ 停止重複播放</button>
   </div>
 
+  <button onclick="downloadJSON()">下載 JSON</button>
+  <input type="file" id="json-upload" style="display:none" accept=".json" onchange="uploadJSON(event)">
+  <button onclick="document.getElementById('json-upload').click()">上傳 JSON</button>
+
   <hr>
   <h3>已儲存項目</h3>
   <div id="saved-entries"></div>

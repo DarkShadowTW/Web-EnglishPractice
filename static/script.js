@@ -1,4 +1,5 @@
 let repeatMode = null;
+let isSpeaking = false; // 👈 旗標避免重疊播放
 
 /**
  * 播放文字語音
@@ -7,12 +8,12 @@ let repeatMode = null;
  * @param {string} lang - 語言代碼，如 en-US, zh-TW, ja-JP
  */
 function speak(text, onend = null, lang = 'en-US') {
-  if (!text) {
-    if (onend) onend();
+  if (!text || isSpeaking) {
     return;
   }
 
-  speechSynthesis.cancel(); // 取消任何現有播放
+  isSpeaking = true; // 👈 正在播放
+  speechSynthesis.cancel(); // 取消現有播放
 
   // 從 input 讀取使用者設定的延遲時間（預設為 3000 毫秒）
   const delayInput = document.getElementById('delay');
@@ -26,6 +27,7 @@ function speak(text, onend = null, lang = 'en-US') {
   // 播完後執行 callback
   utterance.onend = () => {
     ended = true;
+    isSpeaking = false; // ✅ 結束播放
     if (onend) {
       setTimeout(onend, delay);
     }
@@ -36,6 +38,7 @@ function speak(text, onend = null, lang = 'en-US') {
   // 安全機制：如果 onend 沒被觸發，delay 毫秒後強制執行
   setTimeout(() => {
     if (!ended && onend) {
+      isSpeaking = false; // ✅ 重設旗標
       setTimeout(onend, delay);
     }
   }, delay);
@@ -129,10 +132,18 @@ function insertEntryBlock(entry, key = null) {
   block.style.marginBottom = '10px';
   block.style.cursor = 'pointer';
 
+  // 記錄進 dataset
+  const date = entry.date || new Date().toISOString().slice(0, 10);
+  const time = entry.time || new Date().toTimeString().slice(0, 8);
+  block.dataset.date = date;
+  block.dataset.time = time;
+
   block.innerHTML = `
-    <div><strong>ENGLISH:</strong> ${entry.EN}</div>
-    <div><strong>中文:</strong> ${entry.CH}</div>
-    <div><strong>日文:</strong> ${entry.JP}</div>
+    <div style="font-size: 11px; color: gray;">🆔 ${key || '(未指定)'}</div>
+    <div data-field="EN"><strong>ENGLISH:</strong> ${entry.EN}</div>
+    <div data-field="CH"><strong>中文:</strong> ${entry.CH}</div>
+    <div data-field="JP"><strong>日文:</strong> ${entry.JP}</div>
+    <div style="font-size: 12px; color: gray;">🕒 ${date} ${time}</div>
     ${key !== null ? `<button onclick="deleteEntry('${key}', this)">DELETE</button>` : ''}
   `;
 
@@ -144,6 +155,7 @@ function insertEntryBlock(entry, key = null) {
 
   container.insertBefore(block, container.firstChild);
 }
+
 
 /**
  * 目的 : 載入所有儲存資料並顯示於畫面下方（依 ID 降冪排序）
@@ -261,6 +273,84 @@ function logout() {
   // 清空已儲存項目顯示
   document.getElementById("saved-entries").innerHTML = "";
 }
+
+function downloadJSON() {
+  const blocks = document.querySelectorAll('.entry-block');
+  const data = [];
+
+  blocks.forEach(block => {
+    const EN = block.querySelector('[data-field="EN"]')?.textContent.replace('ENGLISH:', '').trim() || '';
+    const CH = block.querySelector('[data-field="CH"]')?.textContent.replace('中文:', '').trim() || '';
+    const JP = block.querySelector('[data-field="JP"]')?.textContent.replace('日文:', '').trim() || '';
+
+    const date = block.dataset.date || new Date().toISOString().slice(0, 10);
+    const time = block.dataset.time || new Date().toTimeString().slice(0, 8);
+
+    data.push({ EN, CH, JP, date, time });
+  });
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'my_vocabulary.json';
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function uploadJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error("不是合法的 JSON 陣列");
+
+      const email = window.loggedInEmail;
+      if (!email) {
+        alert("請先登入再上傳！");
+        return;
+      }
+
+      const uploadPromises = [];
+
+      for (const entry of data) {
+        const { EN, CH, JP, date, time } = entry;
+        if (!EN && !CH && !JP) continue;
+
+        const payload = { EN, CH, JP, date, time, email };
+
+        uploadPromises.push(
+          fetch('/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }).then(res => res.json())
+        );
+      }
+
+      // 等所有上傳完成後再顯示
+      Promise.all(uploadPromises).then(results => {
+        loadSavedEntries(); // ✅ 一次性刷新畫面
+        alert(`成功匯入 ${results.length} 筆資料`);
+      });
+
+    } catch (err) {
+      alert('上傳的 JSON 格式錯誤！');
+      console.error(err);
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+
+
+
 
 // 接收 Google 登入後的使用者資訊
 window.handleCredentialResponse = function (response) {

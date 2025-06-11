@@ -8,6 +8,8 @@ import json         #for save file
 from flask import Flask, render_template, jsonify, request   
 #for JSON 存檔時要有 DATE/TIME
 from datetime import datetime
+#產生唯一 Key 的模組
+import uuid
 
 print("Current directory:", os.getcwd())  # 印出目前工作目錄，確保路徑正確
 
@@ -32,32 +34,34 @@ def save():
     from datetime import datetime
 
     data = request.get_json()
-    EN = data.get('EN')
-    CH = data.get('CH')
-    JP = data.get('JP')
+
+    EN = data.get('EN', '').strip()
+    CH = data.get('CH', '').strip()
+    JP = data.get('JP', '').strip()
     email = data.get('email')
 
     if not email:
         return jsonify({'message': '未登入，無法儲存'}), 400
+    if not (EN or CH or JP):
+        return jsonify({'message': '空白資料不儲存'}), 400
 
-    # 從 email 產生安全的檔名（只取 @ 前的部份並移除非法字元）
+    # 安全產生使用者檔名
     user_id = re.sub(r'\W+', '_', email.split('@')[0])
     filename = f'save_{user_id}.json'
 
-    # 加入時間戳
-    now = datetime.now()
-    date = now.strftime("%Y-%m-%d")
-    time = now.strftime("%H:%M:%S")
+    # 使用匯入時提供的時間，否則用現在時間
+    date = data.get('date') or datetime.now().strftime("%Y-%m-%d")
+    time = data.get('time') or datetime.now().strftime("%H:%M:%S")
 
-    # 讀取現有檔案（若有）
+    # 讀舊資料
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             saved = json.load(f)
     except FileNotFoundError:
         saved = {}
 
-    # 產生新的 key
-    new_key = str(max([int(k) for k in saved.keys()] + [0]) + 1)
+    # 產生唯一 key
+    new_key = str(uuid.uuid4())
     saved[new_key] = {
         'EN': EN,
         'CH': CH,
@@ -66,11 +70,14 @@ def save():
         'time': time
     }
 
-    # 寫回檔案
+    # 寫入
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(saved, f, ensure_ascii=False, indent=2)
 
+    print(f"🟢 儲存成功：{EN}/{CH}/{JP} @ {date} {time} -> KEY={new_key}")
+
     return jsonify({'message': '儲存成功'})
+
 
 
 @app.route('/load', methods=['POST'])
