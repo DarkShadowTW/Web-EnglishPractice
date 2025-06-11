@@ -17,13 +17,13 @@ SAVE_FILE = 'save.json'   #保存用的 JSON 檔案
 
 @app.route('/')
 def index():
-    return render_template("index.html")
+    return render_template("index.html", delay=3000)  # 預設為 3000 毫秒
 
 @app.route('/api/data')
 def data():
     return jsonify({
-        "word": "apple",
-        "sentence": "I eat an apple every day."
+        "EN": "apple",
+        "CH": "I eat an apple every day."
     })
 
 @app.route('/save', methods=['POST'])
@@ -32,9 +32,9 @@ def save():
     from datetime import datetime
 
     data = request.get_json()
-    word = data.get('word')
-    sentence = data.get('sentence')
-    chinese = data.get('chinese')
+    EN = data.get('EN')
+    CH = data.get('CH')
+    JP = data.get('JP')
     email = data.get('email')
 
     if not email:
@@ -59,9 +59,9 @@ def save():
     # 產生新的 key
     new_key = str(max([int(k) for k in saved.keys()] + [0]) + 1)
     saved[new_key] = {
-        'word': word,
-        'sentence': sentence,
-        'chinese': chinese,
+        'EN': EN,
+        'CH': CH,
+        'JP': JP,
         'date': date,
         'time': time
     }

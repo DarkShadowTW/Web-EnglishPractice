@@ -1,149 +1,119 @@
-/**
- * 目的 : 儲存重複播放的 interval ID 和模式
- * 給誰呼叫 : 全域變數初始化
- */
-let repeatIntervalId = null;
 let repeatMode = null;
 
 /**
- * 目的 : 使用語音 API 播放指定文字
- * 給誰呼叫 : playAllOnce、startRepeat 內部呼叫
+ * 播放文字語音
+ * @param {string} text - 要朗讀的文字
+ * @param {function|null} onend - 播放結束後要執行的動作
+ * @param {string} lang - 語言代碼，如 en-US, zh-TW, ja-JP
  */
-function speak(text, onend) {
-  if (!text) return;
-  speechSynthesis.cancel();  // ← 這行是重點
+function speak(text, onend = null, lang = 'en-US') {
+  if (!text) {
+    if (onend) onend();
+    return;
+  }
+
+  speechSynthesis.cancel(); // 取消任何現有播放
+
+  // 從 input 讀取使用者設定的延遲時間（預設為 3000 毫秒）
+  const delayInput = document.getElementById('delay');
+  const delay = parseInt(delayInput?.value || '3000');
+
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-US";
-  utterance.onend = onend;
+  utterance.lang = lang;
+
+  let ended = false;
+
+  // 播完後執行 callback
+  utterance.onend = () => {
+    ended = true;
+    if (onend) {
+      setTimeout(onend, delay);
+    }
+  };
+
   speechSynthesis.speak(utterance);
+
+  // 安全機制：如果 onend 沒被觸發，delay 毫秒後強制執行
+  setTimeout(() => {
+    if (!ended && onend) {
+      setTimeout(onend, delay);
+    }
+  }, delay);
 }
 
-
-
 /**
- * 目的 : 啟動重複播放模式（單字、句子、單字+句子、單字+句子+中文）
- * 給誰呼叫 : 按鈕點擊事件，如 startRepeat('word')、startRepeat('sentence') 等
+ * 啟動重複播放模式
+ * @param {string} mode - EN / CH / JP / all
  */
 function startRepeat(mode) {
-  stopRepeat();           // 停止任何現有的語音播放循環
-  repeatMode = mode;      // 記錄當前模式
+  stopRepeat();
+  repeatMode = mode;
 
-  if (mode === 'word') {
-    // 每 2 秒重複播放單字
-    repeatIntervalId = setInterval(() => {
-      const word = document.getElementById('word').value.trim();
-      speak(word);
-    }, 2000);
+  if (mode === 'EN') {
+    const repeat = () => {
+      if (repeatMode !== 'EN') return;
+      const text = document.getElementById('EN').value.trim();
+      speak(text, repeat, 'en-US');
+    };
+    repeat();
 
-  } else if (mode === 'sentence') {
-    // 每 4 秒重複播放句子
-    repeatIntervalId = setInterval(() => {
-      const sentence = document.getElementById('sentence').value.trim();
-      speak(sentence);
-    }, 4000);
+  } else if (mode === 'CH') {
+    const repeat = () => {
+      if (repeatMode !== 'CH') return;
+      const text = document.getElementById('CH').value.trim();
+      speak(text, repeat, 'zh-TW');
+    };
+    repeat();
 
-  } else if (mode === 'both') {
-    // 單字與句子交替播放，每 3 秒切換一次
-    let playWord = true;
-    repeatIntervalId = setInterval(() => {
-      if (playWord) {
-        const word = document.getElementById('word').value.trim();
-        speak(word);
-      } else {
-        const sentence = document.getElementById('sentence').value.trim();
-        speak(sentence);
-      }
-      playWord = !playWord;
-    }, 3000);
+  } else if (mode === 'JP') {
+    const repeat = () => {
+      if (repeatMode !== 'JP') return;
+      const text = document.getElementById('JP').value.trim();
+      speak(text, repeat, 'ja-JP');
+    };
+    repeat();
 
   } else if (mode === 'all') {
-    // 啟動完整播放序列：單字 → 句子 → 中文（自動循環）
-
     const playSequence = () => {
-      const word = document.getElementById("word").value.trim();
-      const sentence = document.getElementById("sentence").value.trim();
-      const chinese = document.getElementById("chinese").value.trim();
+      if (repeatMode !== 'all') return;
 
-      speakText(word, 'en-US', function () {
-        speakText(sentence, 'en-US', function () {
-          speakText(chinese, 'zh-TW', function () {
-            if (repeatMode === 'all') {
-              setTimeout(playSequence, 1000); // 1 秒後繼續循環
-            }
-          });
-        });
-      });
+      const steps = [
+        { text: document.getElementById('EN').value.trim(), lang: 'en-US' },
+        { text: document.getElementById('CH').value.trim(), lang: 'zh-TW' },
+        { text: document.getElementById('JP').value.trim(), lang: 'ja-JP' },
+      ];
+
+      let index = 0;
+
+      const playNext = () => {
+        if (repeatMode !== 'all') return;
+
+        if (index >= steps.length) {
+          setTimeout(playSequence, 1000); // 播完一輪後等 1 秒再重播
+          return;
+        }
+
+        const { text, lang } = steps[index++];
+        if (text) {
+          speak(text, playNext, lang);
+        } else {
+          playNext(); // 若空字串則跳過
+        }
+      };
+
+      playNext();
     };
 
-    playSequence(); // 第一次呼叫開始循環
+    playSequence();
   }
 }
 
-
 /**
- * 目的 : 停止所有語音重複播放
- * 給誰呼叫 : startRepeat, playAllOnce
+ * 停止播放
  */
-function playAll() {
-  stopRepeat(); // 停止先前的重複播放（如果有）
-
-  repeatMode = 'all'; // 設定模式
-
-  const playSequence = () => {
-    const word = document.getElementById("word").value;
-    const sentence = document.getElementById("sentence").value;
-    const chinese = document.getElementById("chinese").value;
-
-    speakText(word, 'en-US', function () {
-      speakText(sentence, 'en-US', function () {
-        speakText(chinese, 'zh-TW', function () {
-          // 完成一次播放後等待 1 秒再重播
-          if (repeatMode === 'all') {
-            setTimeout(playSequence, 1000);
-          }
-        });
-      });
-    });
-  };
-
-  playSequence(); // 啟動首次播放
-}
-
-
-/**
- * 目的 : 播放一次 Word ➜ Sentence
- * 給誰呼叫 : 按鈕點擊事件
- */
-function playAllOnce() {
-  stopRepeat();
-
-  const word = document.getElementById('word').value.trim();
-  const sentence = document.getElementById('sentence').value.trim();
-
-  speak(word, () => {
-    speak(sentence);
-  });
-}
-
-/**
- * 目的 : 播放 Word ➜ Sentence ➜ 中文，支援語系切換
- * 給誰呼叫 : playAll 按鈕點擊事件
- */
-function speakText(text, lang = 'en-US', onend = null) {
-  if (!text) return;
-  speechSynthesis.cancel();  // ← 同樣要加這行
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = lang;
-  if (onend) utterance.onend = onend;
-  speechSynthesis.speak(utterance);
-}
-
-/**
- * 目的 : 依序播放 Word ➜ Sentence ➜ 中文發音
- * 給誰呼叫 : 按鈕點擊事件
- */
-function playAll() {
-  startRepeat('all');
+function stopRepeat() {
+  repeatMode = null;
+  speechSynthesis.cancel();
 }
 
 /**
@@ -160,16 +130,16 @@ function insertEntryBlock(entry, key = null) {
   block.style.cursor = 'pointer';
 
   block.innerHTML = `
-    <div><strong>Word:</strong> ${entry.word}</div>
-    <div><strong>Sentence:</strong> ${entry.sentence}</div>
-    <div><strong>中文:</strong> ${entry.chinese}</div>
+    <div><strong>ENGLISH:</strong> ${entry.EN}</div>
+    <div><strong>中文:</strong> ${entry.CH}</div>
+    <div><strong>日文:</strong> ${entry.JP}</div>
     ${key !== null ? `<button onclick="deleteEntry('${key}', this)">DELETE</button>` : ''}
   `;
 
   block.ondblclick = () => {
-    document.getElementById('word').value = entry.word;
-    document.getElementById('sentence').value = entry.sentence;
-    document.getElementById('chinese').value = entry.chinese;
+    document.getElementById('EN').value = entry.EN;
+    document.getElementById('CH').value = entry.CH;
+    document.getElementById('JP').value = entry.JP;
   };
 
   container.insertBefore(block, container.firstChild);
@@ -207,7 +177,6 @@ function loadSavedEntries() {
     });
 }
 
-
 /**
  * 目的 : 刪除指定儲存資料並從畫面移除
  * 給誰呼叫 : 由 DELETE 按鈕觸發
@@ -234,15 +203,14 @@ function deleteEntry(key, btn) {
     });
 }
 
-
 /**
  * 目的 : 儲存使用者輸入的 word/sentence/chinese 到伺服器，並附加登入 email
  * 給誰呼叫 : 按鈕 onclick="saveEntry()"
  */
 function saveEntry() {
-  const word = document.getElementById('word').value;
-  const sentence = document.getElementById('sentence').value;
-  const chinese = document.getElementById('chinese').value;
+  const EN = document.getElementById('EN').value;
+  const CH = document.getElementById('CH').value;
+  const JP = document.getElementById('JP').value;
 
   // 取得登入的使用者 email
   const email = window.loggedInEmail;
@@ -257,7 +225,7 @@ function saveEntry() {
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ word, sentence, chinese, email })
+    body: JSON.stringify({ EN, CH, JP, email })
   })
     .then(res => res.json())
     .then(data => {
@@ -266,23 +234,16 @@ function saveEntry() {
     });
 }
 
+function parseJwt(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
 
-// 接收 Google 登入後的使用者資訊
-function onGoogleSignIn(response) {
-  const credential = response.credential;
-
-  // 將 JWT 解析為 JSON（只要 email）
-  const payload = JSON.parse(atob(credential.split('.')[1]));
-  const email = payload.email;
-
-  // 顯示登入狀態
-  const infoDiv = document.createElement('div');
-  infoDiv.textContent = `已登入帳號：${email}`;
-  document.body.insertBefore(infoDiv, document.body.firstChild);
-
-  // 記住 email（後續送到後端）
-  window.loggedInEmail = email;
+  return JSON.parse(jsonPayload);
 }
+
 
 function logout() {
   // 清除登入資訊
@@ -301,58 +262,51 @@ function logout() {
   document.getElementById("saved-entries").innerHTML = "";
 }
 
-
-function handleCredentialResponse(response) {
+// 接收 Google 登入後的使用者資訊
+window.handleCredentialResponse = function (response) {
   const decoded = parseJwt(response.credential);
-  console.log("登入成功：", decoded);
-  window.loggedInEmail = decoded.email;
-  document.getElementById("g-signin-btn").style.display = "none";
-
-  // ✅ 儲存 email 到 localStorage
-  localStorage.setItem("user_email", decoded.email);
+  const email = decoded.email;
 
   // ✅ 顯示登入狀態
   const infoDiv = document.createElement('div');
-  infoDiv.textContent = `已登入帳號：${decoded.email}`;
+  infoDiv.textContent = `已登入帳號：${email}`;
   document.body.insertBefore(infoDiv, document.body.firstChild);
 
-  // 載入該使用者的資料
+  // ✅ 隱藏登入按鈕
+  const signinBtn = document.getElementById("g-signin-btn");
+  if (signinBtn) signinBtn.style.display = "none";
+
+  // ✅ 儲存登入狀態
+  window.loggedInEmail = email;
+  localStorage.setItem("user_email", email);
+
   loadSavedEntries();
-}
+};
 
-
-// ✅ 頁面載入時自動執行載入資料
+// ✅ 頁面載入時自動讀取登入資訊
 window.onload = function () {
+
+  // 清除任何殘留的語音播放狀態
+  speechSynthesis.cancel();
+
+  // 也可選：播放一個靜音語音來初始化（避免第一次播放被瀏覽器丟掉）
+  const dummy = new SpeechSynthesisUtterance('');
+  dummy.volume = 0;
+  speechSynthesis.speak(dummy);
+
   const savedEmail = localStorage.getItem("user_email");
   if (savedEmail) {
     window.loggedInEmail = savedEmail;
 
-    const signinBtn = document.getElementById("g-signin-btn");
-    if (signinBtn) signinBtn.style.display = "none";
-
+    // 顯示帳號
     const infoDiv = document.createElement('div');
     infoDiv.textContent = `已登入帳號：${savedEmail}`;
     document.body.insertBefore(infoDiv, document.body.firstChild);
 
+    // 隱藏登入按鈕
+    const signinBtn = document.querySelector(".g_id_signin");
+    if (signinBtn) signinBtn.style.display = "none";
+
     loadSavedEntries();
   }
 };
-
-function parseJwt(token) {
-  const base64Url = token.split('.')[1];
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-  }).join(''));
-
-  return JSON.parse(jsonPayload);
-}
-
-function stopRepeat() {
-  if (repeatIntervalId) {
-    clearInterval(repeatIntervalId);
-    repeatIntervalId = null;
-  }
-  repeatMode = null;
-  speechSynthesis.cancel();  // 停止任何播放中語音
-}
